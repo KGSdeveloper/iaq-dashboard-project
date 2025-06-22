@@ -9,7 +9,9 @@
   }
   
   body {
-    @apply font-sans bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white min-h-screen overflow-x-hidden;
+    @apply font-sans text-white min-h-screen overflow-x-hidden;
+    margin: 0;
+    padding: 0;
   }
   
   html {
@@ -18,27 +20,21 @@
 }
 
 @layer components {
-  /* Glass Morphism Effect */
-  .glass-morphism {
+  /* Glass Morphism Effect - Matching Demo */
+  .glass-card {
     background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(5px);
     -webkit-backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  /* Glass Card Component */
-  .glass-card {
-    @apply glass-morphism rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:-translate-y-1;
+    border-radius: 1rem;
+    padding: 1.5rem;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
   }
   
   .glass-card:hover {
+    transform: translateY(-2px);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-  }
-  
-  /* Colored Bar Component */
-  .card-bar {
-    @apply absolute top-0 left-0 right-0 h-1 rounded-t-2xl;
   }
   
   /* Status Indicators */
@@ -50,18 +46,16 @@
   
   /* Custom Button Styles */
   .btn-glass {
-    @apply glass-morphism px-4 py-2 rounded-lg text-white hover:bg-white/20 transition-all duration-300;
-  }
-  
-  /* Sensor Value Display */
-  .sensor-value-display {
-    @apply text-4xl lg:text-5xl font-bold text-white;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    @apply px-4 py-2 rounded-lg text-white hover:bg-white hover:bg-opacity-20 transition-all duration-300;
   }
 }
 
 @layer utilities {
-  /* Custom Animations */
+  /* Custom Animations - Matching Demo */
   @keyframes float {
     0%, 100% { 
       transform: translateY(0px) rotate(0deg); 
@@ -98,6 +92,24 @@
     }
   }
   
+  @keyframes heartbeat {
+    0%, 100% { 
+      transform: scale(1); 
+    }
+    50% { 
+      transform: scale(1.05); 
+    }
+  }
+  
+  @keyframes elastic {
+    0% { transform: scale(1); }
+    20% { transform: scale(1.1); }
+    40% { transform: scale(0.95); }
+    60% { transform: scale(1.02); }
+    80% { transform: scale(0.98); }
+    100% { transform: scale(1); }
+  }
+  
   .animate-float {
     animation: float 3s ease-in-out infinite;
   }
@@ -112,6 +124,14 @@
   
   .animate-pulse-gentle {
     animation: pulse-gentle 3s ease-in-out infinite;
+  }
+  
+  .animate-heartbeat {
+    animation: heartbeat 2s ease-in-out infinite;
+  }
+  
+  .ease-elastic {
+    transition-timing-function: cubic-bezier(0.68, -0.55, 0.265, 1.55);
   }
   
   /* Text Shadow */
@@ -155,6 +175,15 @@
   );
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
+}
+
+/* Specific duration classes for animations */
+.duration-\[3000ms\] {
+  animation-duration: 3000ms;
+}
+
+.duration-\[5000ms\] {
+  animation-duration: 5000ms;
 }
 
 /* Print Styles */

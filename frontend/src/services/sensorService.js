@@ -1,8 +1,14 @@
+import io from 'socket.io-client';
+
 class SensorService {
   constructor() {
     this.subscribers = [];
-    this.intervalId = null;
-    this.isSimulating = true;
+    this.socket = null;
+    this.backendUrl = 'http://localhost:3001';
+    this.isConnected = false;
+    this.isSimulating = false;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
     this.currentData = {
       PM25: 16.60,
       CO2: 656.53,
@@ -12,8 +18,157 @@ class SensorService {
       DIFFERENTIAL_PRESSURE: 4.03,
       timestamp: Date.now(),
       connectionStatus: {
-        connected: true,
+        connected: false,
         simulation: true
+      }
+    };
+  }
+
+  // Initialize WebSocket connection
+  async connect() {
+    try {
+      console.log('🔌 Connecting to backend...');
+      
+      this.socket = io(this.backendUrl, {
+        autoConnect: true,
+        reconnection: true,
+        reconnectionAttempts: this.maxReconnectAttempts,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000
+      });
+
+      this.setupSocketListeners();
+      
+      return new Promise((resolve) => {
+        this.socket.on('connect', () => {
+          console.log('✅ Connected to backend');
+          this.isConnected = true;
+          this.reconnectAttempts = 0;
+          this.notifyConnectionStatus();
+          resolve(true);
+        });
+
+        this.socket.on('connect_error', (error) => {
+          console.warn('⚠️ Backend connection failed, using simulation:', error.message);
+          this.handleConnectionError();
+          resolve(false);
+        });
+      });
+    } catch (error) {
+      console.error('❌ Connection error:', error);
+      this.handleConnectionError();
+      return false;
+    }
+  }
+
+  setupSocketListeners() {
+    // Handle incoming sensor data
+    this.socket.on('sensorData', (data) => {
+      const dataSource = data.connectionStatus?.simulation ? 
+        'Backend simulation (Modbus disconnected)' : 
+        'Real Modbus data + simulated pressure';
+      
+      console.log(`📊 Received sensor data (${dataSource}):`, data);
+      
+      this.currentData = {
+        ...data,
+        timestamp: Date.now()
+      };
+      this.isSimulating = data.connectionStatus?.simulation || false;
+      this.notifySubscribers(this.currentData);
+    });
+
+    // Handle connection status updates
+    this.socket.on('connectionStatus', (status) => {
+      console.log('📡 Connection status:', status);
+      this.isConnected = status.connected;
+      this.isSimulating = status.simulation;
+      this.notifyConnectionStatus();
+    });
+
+    // Handle sensor errors
+    this.socket.on('sensorError', (error) => {
+      console.error('❌ Sensor error:', error);
+      this.notifySubscribers({
+        ...this.currentData,
+        error: error.error,
+        timestamp: Date.now()
+      });
+    });
+
+    // Handle disconnection
+    this.socket.on('disconnect', (reason) => {
+      console.warn('🔌 Disconnected from backend:', reason);
+      this.isConnected = false;
+      this.handleConnectionError();
+    });
+
+    // Handle reconnection
+    this.socket.on('reconnect', (attemptNumber) => {
+      console.log(`✅ Reconnected to backend (attempt ${attemptNumber})`);
+      this.isConnected = true;
+      this.reconnectAttempts = 0;
+      this.notifyConnectionStatus();
+    });
+
+    this.socket.on('reconnect_error', (error) => {
+      this.reconnectAttempts++;
+      console.warn(`⚠️ Reconnection failed (${this.reconnectAttempts}/${this.maxReconnectAttempts}):`, error.message);
+      
+      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        console.log('🎭 Max reconnection attempts reached, switching to simulation');
+        this.handleConnectionError();
+      }
+    });
+  }
+
+  handleConnectionError() {
+    this.isConnected = false;
+    this.isSimulating = true;
+    this.startSimulationMode();
+    this.notifyConnectionStatus();
+  }
+
+  startSimulationMode() {
+    if (this.simulationInterval) {
+      clearInterval(this.simulationInterval);
+    }
+
+    console.log('🎭 Starting frontend simulation mode (backend unavailable)');
+    console.log('📊 All sensor data simulated locally');
+    
+    // Generate simulated data every 5 seconds
+    this.simulationInterval = setInterval(() => {
+      const simulatedData = this.generateSimulatedData();
+      this.currentData = simulatedData;
+      this.notifySubscribers(simulatedData);
+    }, 5000);
+  }
+
+  generateSimulatedData() {
+    // Base values matching your screenshot - used only when backend is unavailable
+    const baseData = {
+      PM25: 16.60,
+      CO2: 656.53,
+      TEMPERATURE: 22.9,
+      HUMIDITY: 53.47,
+      TVOC: 328.01,
+      DIFFERENTIAL_PRESSURE: 4.03
+    };
+
+    // Add realistic variations to all values
+    return {
+      PM25: Math.max(0, baseData.PM25 + (Math.random() - 0.5) * 2),
+      CO2: Math.max(300, baseData.CO2 + (Math.random() - 0.5) * 50),
+      TEMPERATURE: baseData.TEMPERATURE + (Math.random() - 0.5) * 1,
+      HUMIDITY: Math.max(0, Math.min(100, baseData.HUMIDITY + (Math.random() - 0.5) * 3)),
+      TVOC: Math.max(0, baseData.TVOC + (Math.random() - 0.5) * 20),
+      DIFFERENTIAL_PRESSURE: Math.max(0, baseData.DIFFERENTIAL_PRESSURE + (Math.random() - 0.5) * 0.5),
+      timestamp: Date.now(),
+      connectionStatus: {
+        connected: false,
+        simulation: true,
+        note: 'Frontend simulation (backend unavailable)'
       }
     };
   }
@@ -31,169 +186,114 @@ class SensorService {
     };
   }
 
-  // Notify all subscribers
+  // Notify all subscribers of data updates
   notifySubscribers(data) {
-    this.subscribers.forEach(callback => callback(data));
+    this.subscribers.forEach(callback => {
+      try {
+        callback(data);
+      } catch (error) {
+        console.error('❌ Error in subscriber callback:', error);
+      }
+    });
+  }
+
+  // Notify subscribers of connection status changes
+  notifyConnectionStatus() {
+    const statusUpdate = {
+      ...this.currentData,
+      connectionStatus: {
+        connected: this.isConnected,
+        simulation: this.isSimulating
+      }
+    };
+    this.notifySubscribers(statusUpdate);
   }
 
   // Start monitoring sensors
-  startMonitoring(interval = 5000) {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
+  async startMonitoring(interval = 5000) {
+    console.log('🔄 Starting sensor monitoring...');
+    
+    // Connect to backend
+    await this.connect();
+    
+    // Request initial data
+    if (this.socket && this.isConnected) {
+      this.socket.emit('requestData');
     }
-
-    this.intervalId = setInterval(() => {
-      this.fetchSensorData();
-    }, interval);
-
-    // Initial fetch
-    this.fetchSensorData();
+    
+    console.log(`📊 Monitoring started (${interval}ms intervals)`);
   }
 
   // Stop monitoring
   stopMonitoring() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
-  }
-
-  // Fetch sensor data (real or simulated)
-  async fetchSensorData() {
-    try {
-      let data;
-      
-      if (this.isSimulating) {
-        data = this.generateSimulatedData();
-      } else {
-        data = await this.fetchRealSensorData();
-      }
-
-      this.currentData = {
-        ...data,
-        timestamp: Date.now(),
-        connectionStatus: {
-          connected: true,
-          simulation: this.isSimulating
-        }
-      };
-
-      this.notifySubscribers(this.currentData);
-    } catch (error) {
-      console.error('Error fetching sensor data:', error);
-      
-      this.notifySubscribers({
-        ...this.currentData,
-        error: 'Failed to fetch sensor data',
-        connectionStatus: {
-          connected: false,
-          simulation: this.isSimulating
-        }
-      });
-    }
-  }
-
-  // Generate simulated data with realistic variations
-  generateSimulatedData() {
-    const baseData = {
-      PM25: 16.60,
-      CO2: 656.53,
-      TEMPERATURE: 22.9,
-      HUMIDITY: 53.47,
-      TVOC: 328.01,
-      DIFFERENTIAL_PRESSURE: 4.03
-    };
-
-    // Add small random variations
-    return {
-      PM25: this.addVariation(baseData.PM25, 0.5),
-      CO2: this.addVariation(baseData.CO2, 10),
-      TEMPERATURE: this.addVariation(baseData.TEMPERATURE, 0.2),
-      HUMIDITY: this.addVariation(baseData.HUMIDITY, 1),
-      TVOC: this.addVariation(baseData.TVOC, 5),
-      DIFFERENTIAL_PRESSURE: this.addVariation(baseData.DIFFERENTIAL_PRESSURE, 0.1)
-    };
-  }
-
-  // Add random variation to a value
-  addVariation(baseValue, maxVariation) {
-    const variation = (Math.random() - 0.5) * 2 * maxVariation;
-    return Math.max(0, baseValue + variation);
-  }
-
-  // Fetch real sensor data from hardware/API
-  async fetchRealSensorData() {
-    // This would connect to your actual sensor hardware
-    // For now, return simulated data
+    console.log('⏸️ Stopping sensor monitoring');
     
-    try {
-      // Example API call
-      // const response = await fetch('/api/sensors');
-      // return await response.json();
-      
-      // Or Modbus connection
-      // const modbusData = await this.readModbusData();
-      // return modbusData;
-      
-      // For now, return simulated data
-      return this.generateSimulatedData();
-    } catch (error) {
-      throw new Error('Failed to connect to sensor hardware');
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
     }
-  }
-
-  // Read data from Modbus devices
-  async readModbusData() {
-    // This would use modbus-serial library to read from actual devices
-    // Implementation depends on your specific hardware setup
     
-    /*
-    const ModbusRTU = require("modbus-serial");
-    const client = new ModbusRTU();
-    
-    try {
-      await client.connectTCP("192.168.1.100", { port: 502 });
-      client.setID(1);
-      
-      const pm25 = await client.readHoldingRegisters(61, 1);
-      const co2 = await client.readHoldingRegisters(62, 1);
-      const temp = await client.readHoldingRegisters(63, 1);
-      const humidity = await client.readHoldingRegisters(64, 1);
-      const tvoc = await client.readHoldingRegisters(65, 1);
-      
-      client.close();
-      
-      return {
-        PM25: pm25.data[0] / 100,
-        CO2: co2.data[0],
-        TEMPERATURE: temp.data[0] / 100,
-        HUMIDITY: humidity.data[0] / 100,
-        TVOC: tvoc.data[0],
-        DIFFERENTIAL_PRESSURE: 4.03 // From separate sensor
-      };
-    } catch (error) {
-      client.close();
-      throw error;
+    if (this.simulationInterval) {
+      clearInterval(this.simulationInterval);
+      this.simulationInterval = null;
     }
-    */
     
-    return this.generateSimulatedData();
+    this.isConnected = false;
   }
 
   // Manual refresh
   async refreshData() {
-    await this.fetchSensorData();
-  }
-
-  // Toggle between real and simulated data
-  setSimulationMode(enabled) {
-    this.isSimulating = enabled;
-    this.currentData.connectionStatus.simulation = enabled;
+    if (this.socket && this.isConnected) {
+      console.log('🔄 Requesting fresh sensor data...');
+      this.socket.emit('requestData');
+    } else {
+      console.log('🎭 Generating fresh simulation data...');
+      const data = this.generateSimulatedData();
+      this.currentData = data;
+      this.notifySubscribers(data);
+    }
   }
 
   // Get current data
   getCurrentData() {
     return this.currentData;
+  }
+
+  // Get connection status
+  getConnectionStatus() {
+    return {
+      connected: this.isConnected,
+      simulation: this.isSimulating,
+      hasSocket: !!this.socket
+    };
+  }
+
+  // Force simulation mode
+  setSimulationMode(enabled) {
+    if (enabled && !this.isSimulating) {
+      console.log('🎭 Switching to simulation mode');
+      this.isSimulating = true;
+      this.startSimulationMode();
+    } else if (!enabled && this.isSimulating) {
+      console.log('📡 Attempting to connect to real sensors');
+      if (this.simulationInterval) {
+        clearInterval(this.simulationInterval);
+        this.simulationInterval = null;
+      }
+      this.connect();
+    }
+  }
+
+  // Check if backend is available
+  async checkBackendHealth() {
+    try {
+      const response = await fetch(`${this.backendUrl}/api/health`);
+      const health = await response.json();
+      return health;
+    } catch (error) {
+      console.warn('⚠️ Backend health check failed:', error.message);
+      return null;
+    }
   }
 }
 
