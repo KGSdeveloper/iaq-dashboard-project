@@ -1,0 +1,161 @@
+/* ==================== src/index.css ==================== */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Global Styles */
+@layer base {
+  * {
+    @apply box-border;
+  }
+  
+  body {
+    @apply font-body bg-dashboard-bg text-white min-h-screen overflow-x-hidden;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* Glass Card Component */
+  .glass-card {
+    @apply glass-morphism rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-glass;
+  }
+  
+  /* Colored Bar Component */
+  .card-bar {
+    @apply absolute top-0 left-0 right-0 h-1 rounded-t-2xl;
+  }
+  
+  /* Specific Bar Gradients */
+  .rainbow-bar { @apply bg-rainbow-bar; }
+  .temperature-bar { @apply bg-temperature-bar; }
+  .humidity-bar { @apply bg-humidity-bar; }
+  .co2-bar { @apply bg-co2-bar; }
+  .pm25-bar { @apply bg-pm25-bar; }
+  .weather-bar { @apply bg-weather-bar; }
+  .tvoc-bar { @apply bg-tvoc-bar; }
+  .pressure-bar { @apply bg-pressure-bar; }
+  
+  /* Status Indicators */
+  .status-excellent { @apply text-iaq-excellent; }
+  .status-good { @apply text-iaq-good; }
+  .status-moderate { @apply text-iaq-moderate; }
+  .status-poor { @apply text-iaq-poor; }
+  .status-critical { @apply text-iaq-critical; }
+  
+  /* Custom Button Styles */
+  .btn-glass {
+    @apply glass-morphism px-4 py-2 rounded-lg text-white hover:bg-white/20 transition-all duration-300;
+  }
+  
+  /* Sensor Value Display */
+  .sensor-value-display {
+    @apply text-4xl lg:text-5xl font-bold text-white text-shadow;
+  }
+  
+  /* Animated Elements */
+  .animate-mercury {
+    animation: mercury-rise 2s ease-out forwards;
+  }
+  
+  .animate-water-fill {
+    animation: water-fill 2s ease-out forwards;
+  }
+  
+  .animate-needle {
+    transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: center bottom;
+  }
+}
+
+@layer utilities {
+  /* Custom Animations */
+  @keyframes mercury-rise {
+    from { height: 0%; }
+    to { height: var(--mercury-height); }
+  }
+  
+  @keyframes water-fill {
+    from { 
+      clip-path: polygon(0% 100%, 100% 100%, 100% 100%, 0% 100%);
+    }
+    to { 
+      clip-path: polygon(0% var(--water-level), 100% var(--water-level), 100% 100%, 0% 100%);
+    }
+  }
+  
+  @keyframes pressure-pulse {
+    0%, 100% { 
+      stroke-width: 8;
+      filter: drop-shadow(0 0 5px currentColor);
+    }
+    50% { 
+      stroke-width: 10;
+      filter: drop-shadow(0 0 15px currentColor);
+    }
+  }
+  
+  @keyframes face-blink {
+    0%, 90%, 100% { transform: scaleY(1); }
+    95% { transform: scaleY(0.1); }
+  }
+  
+  @keyframes weather-float {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-5px) rotate(2deg); }
+  }
+  
+  /* Responsive Text Sizes */
+  .text-responsive-xs { @apply text-xs sm:text-sm; }
+  .text-responsive-sm { @apply text-sm sm:text-base; }
+  .text-responsive-base { @apply text-base sm:text-lg; }
+  .text-responsive-lg { @apply text-lg sm:text-xl; }
+  .text-responsive-xl { @apply text-xl sm:text-2xl; }
+  .text-responsive-2xl { @apply text-2xl sm:text-3xl; }
+  .text-responsive-3xl { @apply text-3xl sm:text-4xl lg:text-5xl; }
+  
+  /* Custom Gradients */
+  .bg-iaq-excellent { @apply bg-gradient-to-r from-green-400 to-emerald-500; }
+  .bg-iaq-good { @apply bg-gradient-to-r from-blue-400 to-blue-500; }
+  .bg-iaq-moderate { @apply bg-gradient-to-r from-yellow-400 to-orange-500; }
+  .bg-iaq-poor { @apply bg-gradient-to-r from-orange-500 to-red-500; }
+  .bg-iaq-critical { @apply bg-gradient-to-r from-red-600 to-red-800; }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-800 rounded-lg;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-daikin-blue rounded-lg hover:bg-daikin-lightblue;
+}
+
+/* Loading States */
+.loading-shimmer {
+  background: linear-gradient(90deg, 
+    rgba(255,255,255,0.1) 25%, 
+    rgba(255,255,255,0.2) 50%, 
+    rgba(255,255,255,0.1) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Print Styles */
+@media print {
+  .glass-card {
+    @apply bg-white text-black border border-gray-300;
+  }
+  
+  .card-bar {
+    @apply bg-gray-400;
+  }
+}
