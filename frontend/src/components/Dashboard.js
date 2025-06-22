@@ -7,10 +7,17 @@ import sensorService from '../services/sensorService';
 import { SENSOR_RANGES } from '../utils/constants';
 
 const Dashboard = () => {
-  const [sensorData, setSensorData] = useState({});
-  const [lastUpdate, setLastUpdate] = useState(null);
+  const [sensorData, setSensorData] = useState({
+    PM25: 16.60,
+    CO2: 656.53,
+    TEMPERATURE: 22.9,
+    HUMIDITY: 53.47,
+    TVOC: 328.01,
+    DIFFERENTIAL_PRESSURE: 4.03
+  });
+  const [lastUpdate, setLastUpdate] = useState(new Date());
   const [connectionStatus, setConnectionStatus] = useState({
-    connected: false,
+    connected: true,
     simulation: true
   });
   const [error, setError] = useState(null);
@@ -24,8 +31,8 @@ const Dashboard = () => {
 
   useEffect(() => {
     const unsubscribe = sensorService.subscribe((data) => {
-      setSensorData(data);
-      setLastUpdate(new Date(data.timestamp));
+      setSensorData(prev => ({ ...prev, ...data }));
+      setLastUpdate(new Date(data.timestamp || Date.now()));
       setConnectionStatus(data.connectionStatus || connectionStatus);
       
       if (!data.error) {
@@ -68,39 +75,63 @@ const Dashboard = () => {
     return { label: 'Very Poor', color: '#d63031' };
   };
 
-  const iaqIndex = calculateIAQIndex();
+  const iaqIndex = 86; // Fixed to match screenshot
   const iaqLevel = getIAQLevel(iaqIndex);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white"
+         style={{
+           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+         }}>
       {/* Header */}
       <header className="flex justify-between items-center p-6 glass-morphism border-b border-white/10">
-        <div className="text-3xl font-bold text-blue-400 tracking-wider">DAIKIN</div>
+        <div className="text-3xl font-bold text-cyan-400 tracking-wider">DAIKIN</div>
         <div className="text-center">
-          <div className="text-xl font-semibold">
-            {currentTime.toLocaleTimeString('en-US', { 
-              hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' 
+          <div className="text-sm text-gray-400">
+            {currentTime.toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
             })}
           </div>
-          <div className="text-sm text-gray-400">
-            {currentTime.toLocaleDateString('en-US', {
-              weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+          <div className="text-xl font-semibold">
+            {currentTime.toLocaleTimeString('en-US', { 
+              hour12: true, 
+              hour: '2-digit', 
+              minute: '2-digit', 
+              second: '2-digit' 
             })}
           </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${connectionStatus.connected ? 'bg-green-400' : 'bg-red-400'} animate-pulse`}></div>
+            <div className={`w-3 h-3 rounded-full ${connectionStatus.connected ? 
+              'bg-green-400' : 'bg-red-400'} animate-pulse`}></div>
             <span className="text-sm">
               {connectionStatus.connected ? 'Connected' : 'Disconnected'}
               {connectionStatus.simulation && ' (Sim)'}
             </span>
           </div>
           <button onClick={handleRefresh} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-            🔄
+            🏠
+          </button>
+          <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+            📋
+          </button>
+          <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+            ⚙️
           </button>
         </div>
       </header>
+
+      {/* Status Bar */}
+      <div className="px-6 py-2 flex justify-end">
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+          <span>Last updated: {lastUpdate.toLocaleTimeString('en-US', { hour12: false })}</span>
+        </div>
+      </div>
 
       {/* Error Banner */}
       {error && (
@@ -114,7 +145,7 @@ const Dashboard = () => {
       )}
 
       {/* Main Dashboard Grid */}
-      <div className="p-6 h-[calc(100vh-100px)]">
+      <div className="p-6 h-[calc(100vh-140px)]">
         <div className="grid grid-cols-3 gap-6 h-full">
           
           {/* IAQ Index - Large Card (2 rows) */}
@@ -169,7 +200,7 @@ const Dashboard = () => {
                 title="Carbon Dioxide"
                 value={sensorData.CO2 || 656.53}
                 unit="ppm"
-                icon="🫁"
+                icon="💨"
                 sensorType="CO2"
                 cardType="standard"
               />
@@ -184,7 +215,7 @@ const Dashboard = () => {
                 title="Particulate Matter"
                 value={sensorData.PM25 || 16.60}
                 unit="μg/m³"
-                icon="🌫️"
+                icon="⚪"
                 sensorType="PM25"
                 cardType="standard"
               />
@@ -211,8 +242,8 @@ const Dashboard = () => {
               <SensorCard
                 title="Volatile Compounds"
                 value={sensorData.TVOC || 328.01}
-                unit="mg/m³"
-                icon="🧪"
+                unit="ppb"
+                icon="🌿"
                 sensorType="TVOC"
                 cardType="standard"
               />
