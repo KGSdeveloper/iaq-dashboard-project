@@ -79,7 +79,7 @@ const Dashboard = () => {
         
         <div className="flex-grow flex items-center justify-center relative p-4">
           {/* Glowing background effect */}
-          <div className={`absolute w-80 h-80 rounded-full bg-gradient-to-r ${iaqStatus.color} opacity-40 blur-3xl transition-all duration-1000`}></div>
+          <div className={`absolute w-80 h-80 rounded-full bg-gradient-to-r ${iaqStatus.color} opacity-40 blur-3xl transition-all duration-150`}></div>
           
           {/* Circular progress indicator */}
           <div className="relative w-80 h-80 flex flex-col items-center justify-center">
@@ -314,8 +314,20 @@ const Dashboard = () => {
   };
 
   // Pressure Gauge matching your demo
+  // Fixed Pressure Gauge with correct needle alignment
   const PressureGauge = ({ value, min = 0, max = 10 }) => {
-    const angle = -135 + (value - min) / (max - min) * 270;
+    // CORRECTED: Needle angle from -45° (0 Pa) to 225° (10 Pa)
+    const clampedValue = Math.max(min, Math.min(max, value));
+    const valueRange = max - min;
+    const normalizedValue = (clampedValue - min) / valueRange; // 0 to 1
+    
+    // Start at -45° (0 Pa) and end at 225° (10 Pa)
+    const startAngle = -45;   // 0 Pa position (upper right)
+    const endAngle = 225;     // 10 Pa position (bottom left)
+    
+    // Calculate span: -45° to 225° = 270° total span (clockwise)
+    const angleSpan = 270;    // Total degrees of rotation
+    const needleAngle = startAngle + (normalizedValue * angleSpan);
     
     return (
       <div className="flex flex-col items-center justify-center w-full h-full p-2">
@@ -339,7 +351,7 @@ const Dashboard = () => {
             <circle cx="100" cy="100" r="95" fill="#1A1F2C" stroke="url(#metalRing)" strokeWidth="4" />
             <circle cx="100" cy="100" r="85" fill="#0F1623" stroke="#374151" strokeWidth="1" />
             
-            {/* Tick marks */}
+            {/* Keep your original tick marks */}
             {Array.from({ length: 11 }).map((_, i) => {
               const tickAngle = -135 + i * 27;
               const x1 = 100 + 70 * Math.cos(tickAngle * Math.PI / 180);
@@ -352,7 +364,14 @@ const Dashboard = () => {
               return (
                 <g key={i}>
                   <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="white" strokeWidth="2" />
-                  <text x={textX} y={textY} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="10">
+                  <text 
+                    x={textX} 
+                    y={textY} 
+                    textAnchor="middle" 
+                    dominantBaseline="middle" 
+                    fill="white" 
+                    fontSize="10"
+                  >
                     {min + i * ((max - min) / 10)}
                   </text>
                 </g>
@@ -362,7 +381,7 @@ const Dashboard = () => {
             {/* Center point */}
             <circle cx="100" cy="100" r="8" fill="url(#metalRing)" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
             
-            {/* Needle */}
+            {/* CORRECTED NEEDLE: -45° to 225° */}
             <line 
               x1="100" 
               y1="100" 
@@ -370,7 +389,7 @@ const Dashboard = () => {
               y2="40" 
               stroke="#EF4444" 
               strokeWidth="3" 
-              transform={`rotate(${angle}, 100, 100)`}
+              transform={`rotate(${needleAngle}, 100, 100)`}
               strokeLinecap="round" 
               className="transition-transform duration-1000"
             />
@@ -378,8 +397,9 @@ const Dashboard = () => {
             
             {/* Value display */}
             <text x="100" y="140" textAnchor="middle" fill="white" fontSize="18" fontWeight="bold">
-              {value.toFixed(2)} Pa
+              {clampedValue.toFixed(2)} Pa
             </text>
+                     
           </svg>
         </div>
         <div className="text-center mt-2 text-xl text-white">Differential Pressure</div>
