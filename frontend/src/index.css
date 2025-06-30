@@ -5,11 +5,14 @@
 /* Custom Global Styles */
 @layer base {
   * {
-    @apply box-border;
+    box-sizing: border-box;
   }
   
   body {
-    @apply font-sans text-white min-h-screen overflow-x-hidden;
+    font-family: system-ui, -apple-system, sans-serif;
+    color: white;
+    min-height: 100vh;
+    overflow-x: hidden;
     margin: 0;
     padding: 0;
   }
@@ -20,7 +23,7 @@
 }
 
 @layer components {
-  /* Glass Morphism Effect - Matching Demo */
+  /* Glass Morphism Effect */
   .glass-card {
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(5px);
@@ -38,11 +41,21 @@
   }
   
   /* Status Indicators */
-  .status-excellent { @apply text-green-400; }
-  .status-good { @apply text-blue-400; }
-  .status-moderate { @apply text-yellow-400; }
-  .status-poor { @apply text-orange-400; }
-  .status-critical { @apply text-red-400; }
+  .status-excellent { 
+    color: #10B981; 
+  }
+  .status-good { 
+    color: #3B82F6; 
+  }
+  .status-moderate { 
+    color: #F59E0B; 
+  }
+  .status-poor { 
+    color: #F97316; 
+  }
+  .status-critical { 
+    color: #EF4444; 
+  }
   
   /* Custom Button Styles */
   .btn-glass {
@@ -50,27 +63,47 @@
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    @apply px-4 py-2 rounded-lg text-white hover:bg-white hover:bg-opacity-20 transition-all duration-300;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    color: white;
+    transition: all 0.3s ease;
+  }
+  
+  .btn-glass:hover {
+    background: rgba(255, 255, 255, 0.2);
   }
 }
 
 @layer utilities {
-  /* Custom Animations - Matching Demo */
+  /* Enhanced Animations */
   @keyframes float {
     0%, 100% { 
       transform: translateY(0px) rotate(0deg); 
     }
     50% { 
-      transform: translateY(-5px) rotate(2deg); 
+      transform: translateY(-8px) rotate(3deg); 
     }
   }
   
   @keyframes glow {
     0%, 100% { 
-      filter: drop-shadow(0 0 5px currentColor); 
+      filter: drop-shadow(0 0 8px currentColor); 
+      opacity: 0.8;
     }
     50% { 
       filter: drop-shadow(0 0 20px currentColor); 
+      opacity: 1;
+    }
+  }
+
+  @keyframes softglow {
+    0%, 100% { 
+      /*filter: drop-shadow(0 0 8px currentColor);*/
+      opacity: 0.2;
+    }
+    50% { 
+      /*filter: drop-shadow(0 0 20px currentColor); */
+      opacity: 0.5;
     }
   }
   
@@ -83,39 +116,83 @@
     }
   }
   
+  @keyframes pulse {
+    0%{opacity: 0.8;}
+    50%{opacity: 1;}
+    100%{opacity: 0.8;}
+  }
   @keyframes pulse-gentle {
     0%, 100% { 
       opacity: 1; 
+      transform: scale(1);
     }
     50% { 
-      opacity: 0.7; 
+      opacity: 0.8; 
+      transform: scale(1.02);
     }
   }
+  
   
   @keyframes heartbeat {
     0%, 100% { 
       transform: scale(1); 
     }
-    50% { 
-      transform: scale(1.05); 
+    14% { 
+      transform: scale(1.1); 
+    }
+    28% { 
+      transform: scale(1); 
+    }
+    42% { 
+      transform: scale(1.1); 
+    }
+    70% { 
+      transform: scale(1); 
     }
   }
   
-  @keyframes elastic {
-    0% { transform: scale(1); }
-    20% { transform: scale(1.1); }
-    40% { transform: scale(0.95); }
-    60% { transform: scale(1.02); }
-    80% { transform: scale(0.98); }
-    100% { transform: scale(1); }
+  @keyframes ripple {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(2);
+      opacity: 0;
+    }
   }
   
+  @keyframes scaleFromCenter {
+    0% {
+    transform: scale(1);
+    opacity: 1;
+    }
+    50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+    }
+    100% {
+    transform: scale(1);
+    opacity: 1;
+    }
+  }
+
+  .animate-scale-center {
+    transform-origin: 90px 90px;
+    animation: scaleFromCenter 4s ease-in-out infinite;
+  }
+
+  /* Animation Classes */
   .animate-float {
-    animation: float 3s ease-in-out infinite;
+    animation: float 4s ease-in-out infinite;
   }
   
   .animate-glow {
-    animation: glow 2s ease-in-out infinite alternate;
+    animation: glow 3s ease-in-out infinite;
+  }
+
+  .animate-softglow {
+    animation: softglow 3s ease-in-out infinite;
   }
   
   .animate-shimmer {
@@ -127,26 +204,21 @@
   }
   
   .animate-heartbeat {
-    animation: heartbeat 2s ease-in-out infinite;
+    animation: heartbeat 3s ease-in-out infinite;
   }
   
-  .ease-elastic {
-    transition-timing-function: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  .animate-ripple {
+    animation: ripple 2s ease-out infinite;
   }
   
-  /* Text Shadow */
+  /* Text Shadow Enhancement */
   .text-shadow {
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   }
   
-  /* Responsive Text Sizes */
-  .text-responsive-xs { @apply text-xs sm:text-sm; }
-  .text-responsive-sm { @apply text-sm sm:text-base; }
-  .text-responsive-base { @apply text-base sm:text-lg; }
-  .text-responsive-lg { @apply text-lg sm:text-xl; }
-  .text-responsive-xl { @apply text-xl sm:text-2xl; }
-  .text-responsive-2xl { @apply text-2xl sm:text-3xl; }
-  .text-responsive-3xl { @apply text-3xl sm:text-4xl lg:text-5xl; }
+  .text-shadow-glow {
+    text-shadow: 0 0 10px currentColor;
+  }
 }
 
 /* Custom Scrollbar */
@@ -155,15 +227,17 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-800 rounded-lg;
+  background: #1F2937;
+  border-radius: 0.5rem;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-cyan-500 rounded-lg;
+  background: #06B6D4;
+  border-radius: 0.5rem;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-cyan-400;
+  background: #0891B2;
 }
 
 /* Loading States */
@@ -182,28 +256,40 @@
   animation-duration: 3000ms;
 }
 
-.duration-\[5000ms\] {
-  animation-duration: 5000ms;
+.duration-\[4000ms\] {
+  animation-duration: 4000ms;
 }
 
 /* Print Styles */
 @media print {
   .glass-card {
-    @apply bg-white text-black border border-gray-300;
-  }
-  
-  .card-bar {
-    @apply bg-gray-400;
+    background: white;
+    color: black;
+    border: 1px solid #D1D5DB;
   }
 }
 
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
   .glass-card {
-    @apply p-4;
+    padding: 1rem;
   }
   
-  .sensor-value-display {
-    @apply text-2xl;
+  /* Reduce animation intensity on mobile for performance */
+  .animate-glow,
+  .animate-float,
+  .animate-heartbeat {
+    animation-duration: 4s;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-glow,
+  .animate-heartbeat,
+  .animate-pulse-gentle,
+  .animate-ripple {
+    animation: none;
   }
 }
