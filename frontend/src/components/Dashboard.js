@@ -25,22 +25,24 @@ try {
 }
 
 const Dashboard = () => {
+  // Initialize with null values to show loading state
   const [sensorData, setSensorData] = useState({
-    PM25: 16.60,
-    CO2: 656.53,
-    TEMPERATURE: 22.9,
-    HUMIDITY: 53.47,
-    TVOC: 0.328, // Updated to mg/m³
-    DIFFERENTIAL_PRESSURE: 4.03
+    PM25: null,
+    CO2: null,
+    TEMPERATURE: null,
+    HUMIDITY: null,
+    TVOC: null,
+    DIFFERENTIAL_PRESSURE: null
   });
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [connectionStatus, setConnectionStatus] = useState({
-    connected: true,
+    connected: false,
     simulation: true
   });
   const [error, setError] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [currentPage, setCurrentPage] = useState('dashboard'); // 'dashboard' or 'building'
+  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [isDataLoading, setIsDataLoading] = useState(true);
 
   // Update time every second
   useEffect(() => {
@@ -49,59 +51,115 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
+    console.log('🔄 Dashboard: Setting up sensor service subscription');
+    
     const unsubscribe = sensorService.subscribe((data) => {
-      setSensorData(prev => ({ ...prev, ...data }));
-      setLastUpdate(new Date(data.timestamp || Date.now()));
-      setConnectionStatus(data.connectionStatus || connectionStatus);
+      console.log('📊 Dashboard: Received sensor data:', data);
       
-      if (!data.error) {
-        setError(null);
-      } else {
-        setError(data.error);
+      // Update sensor data with actual values from backend
+      setSensorData(prevData => {
+        const newData = {
+          PM25: data.PM25 !== undefined ? data.PM25 : prevData.PM25,
+          CO2: data.CO2 !== undefined ? data.CO2 : prevData.CO2,
+          TEMPERATURE: data.TEMPERATURE !== undefined ? data.TEMPERATURE : prevData.TEMPERATURE,
+          HUMIDITY: data.HUMIDITY !== undefined ? data.HUMIDITY : prevData.HUMIDITY,
+          TVOC: data.TVOC !== undefined ? data.TVOC : prevData.TVOC,
+          DIFFERENTIAL_PRESSURE: data.DIFFERENTIAL_PRESSURE !== undefined ? data.DIFFERENTIAL_PRESSURE : prevData.DIFFERENTIAL_PRESSURE
+        };
+        
+        console.log('📊 Dashboard: Updated sensor data state:', newData);
+        return newData;
+      });
+      
+      // Update connection status
+      if (data.connectionStatus) {
+        setConnectionStatus(data.connectionStatus);
       }
+      
+      // Update last update time
+      if (data.timestamp) {
+        setLastUpdate(new Date(data.timestamp));
+      }
+      
+      // Handle errors
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setError(null);
+      }
+      
+      // Mark as loaded
+      setIsDataLoading(false);
     });
 
+    // Start monitoring
+    console.log('🔄 Dashboard: Starting sensor monitoring');
     sensorService.startMonitoring(5000);
 
     return () => {
+      console.log('🔄 Dashboard: Cleaning up sensor monitoring');
       unsubscribe();
       sensorService.stopMonitoring();
     };
   }, []);
 
   const handleRefresh = async () => {
+    console.log('🔄 Dashboard: Manual refresh requested');
     try {
       await sensorService.refreshData();
     } catch (error) {
+      console.error('❌ Dashboard: Refresh failed:', error);
       setError('Failed to refresh data');
     }
   };
 
+  // Helper function to get display value with fallback
+  const getDisplayValue = (value, fallback = 0) => {
+    if (value === null || value === undefined || isNaN(value)) {
+      return fallback;
+    }
+    return value;
+  };
+
   // Enhanced Status Indicator with meaningful animations
   const EnhancedStatusIndicator = ({ value, sensorType }) => {
-    const status = getSensorStatus(sensorType, value);
+    const displayValue = getDisplayValue(value);
+    const status = getSensorStatus(sensorType, displayValue);
     
     return (
-      <div 
-        className={`h-3 w-3 rounded-full ${status.bgColor} animate-pulse-gentle`}
-        style={{ 
-          boxShadow: status.shadowColor,
-          animation: 'pulse-gentle 3s ease-in-out infinite'
-        }}
-      />
+      <div className="flex items-center gap-2">
+        <div 
+          className={`h-3 w-3 rounded-full ${status.bgColor} animate-pulse-gentle`}
+          style={{ 
+            boxShadow: status.shadowColor,
+            animation: 'pulse-gentle 3s ease-in-out infinite'
+          }}
+        />
+        {isDataLoading && (
+          <span className="text-xs text-white opacity-60">Loading...</span>
+        )}
+      </div>
     );
   };
 
   // Professional IAQ Index Display
   const renderIAQCard = () => {
-    const iaqValue = calculateIAQ(sensorData);
+    const currentSensorData = {
+      PM25: getDisplayValue(sensorData.PM25, 6.5),
+      CO2: getDisplayValue(sensorData.CO2, 725),
+      TEMPERATURE: getDisplayValue(sensorData.TEMPERATURE, 25),
+      HUMIDITY: getDisplayValue(sensorData.HUMIDITY, 53),
+      TVOC: getDisplayValue(sensorData.TVOC, 0.225)
+    };
+    
+    const iaqValue = calculateIAQ(currentSensorData);
     const iaqStatus = getIAQStatus(iaqValue);
     const circumference = 2 * Math.PI * 90;
     const offset = circumference - (iaqValue / 100 * circumference);
     
     return (
       <div className="glass-card relative overflow-hidden row-span-2 flex flex-col h-full">
-        <h3 className="text-xl font-medium mb-4 text-white">Indoor Air Quality</h3>
+        <h3 className="text-2xl font-medium mb-4 text-white">Indoor Air Quality</h3>
         
         <div className="flex-grow flex items-center justify-center relative p-4">
           {/* Gentle glowing background effect */}
@@ -147,7 +205,7 @@ const Dashboard = () => {
               <div className="text-7xl font-bold text-white transition-all duration-500">
                 {iaqValue}
               </div>
-              <div className={`text-xl font-medium mt-2 ${iaqStatus.textColor} transition-colors duration-500`}>
+              <div className={`text-2xl font-medium mt-2 ${iaqStatus.textColor} transition-colors duration-500`}>
                 {iaqStatus.label}
               </div>
               <div className="mt-4 text-4xl animate-float">
@@ -158,7 +216,7 @@ const Dashboard = () => {
         </div>
         
         <div className="mt-2 text-center">
-          <div className="text-lg text-white opacity-90">
+          <div className={'text-2xl text-white opacity-90'}>
             {iaqStatus.description}
           </div>
         </div>
@@ -168,8 +226,9 @@ const Dashboard = () => {
 
   // Enhanced Thermometer with proper mercury color and scale
   const ThermometerDisplay = ({ value, min = 15, max = 35 }) => {
-    const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
-    const status = getSensorStatus('TEMPERATURE', value);
+    const displayValue = getDisplayValue(value, 25);
+    const percentage = Math.min(100, Math.max(0, ((displayValue - min) / (max - min)) * 100));
+    const status = getSensorStatus('TEMPERATURE', displayValue);
     const range = SENSOR_RANGES.TEMPERATURE;
     
     // Generate scale marks every 5 degrees
@@ -209,7 +268,6 @@ const Dashboard = () => {
           {/* Mercury bulb at bottom with glow effect */}
           <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-12 h-12 rounded-full bg-gradient-to-t from-red-700 to-red-500 shadow-lg shadow-red-500 shadow-opacity-50"></div>
           
-          
           {/* Minor scale marks - between major marks */}
           <div className="absolute top-2 bottom-12 left-0 flex flex-col justify-between">
             {Array.from({ length: 21 }).map((_, i) => (
@@ -234,15 +292,15 @@ const Dashboard = () => {
         
         <div className="text-center w-1/2">
           <span className="text-6xl font-bold text-white transition-all duration-500">
-            {value.toFixed(range.decimals)}
+            {displayValue.toFixed(range.decimals)}
           </span>
-          <span className="text-2xl text-white ml-2">{range.unit}</span>
-          <div className="mt-4 text-xl text-white">Temperature</div>
+          <span className="text-3xl text-white ml-2">{range.unit}</span>
+          <div className="mt-4 text-2xl text-white">Temperature</div>
 
-          <div className={`mt-4 text-sm px-3 py-1 rounded-full inline-block transition-colors duration-500 ${status.textColor}`}
+          <div className={`mt-4 text-lg px-3 py-1 rounded-full inline-block transition-colors duration-500 ${status.textColor}`}
                style={{ backgroundColor: `${status.color}20` }}>
-            {value < range.good.min ? 'Too Cold' : 
-             value > range.good.max ? 'Too Hot' : 
+            {displayValue < range.good.min ? 'Too Cold' : 
+             displayValue > range.good.max ? 'Too Hot' : 
              'Comfortable'}
           </div>
         </div>
@@ -252,7 +310,8 @@ const Dashboard = () => {
 
   // Enhanced Humidity Display with water colors
   const HumidityDisplay = ({ value }) => {
-    const status = getSensorStatus('HUMIDITY', value);
+    const displayValue = getDisplayValue(value, 53);
+    const status = getSensorStatus('HUMIDITY', displayValue);
     const range = SENSOR_RANGES.HUMIDITY;
     
     return (
@@ -286,7 +345,7 @@ const Dashboard = () => {
             />
 
             {/* Subtle water ripples only when meaningful */}
-            {value > 50 && (
+            {displayValue > 50 && (
               <g className="animate-pulse duration-[4000ms]" opacity="0.3">
                 <ellipse cx="30" cy="90" rx="8" ry="4" fill="rgba(255,255,255,0.4)" />
                 <ellipse cx="70" cy="105" rx="10" ry="5" fill="rgba(255,255,255,0.3)" />
@@ -300,7 +359,7 @@ const Dashboard = () => {
               filter="url(#waterDropGlow)"
               className="transition-all duration-700 ease-out"
               style={{ 
-                clipPath: `polygon(0% ${100 - value}%, 100% ${100 - value}%, 100% 100%, 0% 100%)`
+                clipPath: `polygon(0% ${100 - displayValue}%, 100% ${100 - displayValue}%, 100% 100%, 0% 100%)`
               }}
             />
 
@@ -320,10 +379,9 @@ const Dashboard = () => {
         
         <div className="text-center w-1/2">
           <div className="text-5xl font-bold text-white transition-all duration-500">
-            {value.toFixed(range.decimals)}
+            {displayValue.toFixed(range.decimals)} {range.unit}
           </div>
-          <div className="text-xl text-white text-opacity-90">{range.unit}</div>
-          <div className="mt-4 text-xl text-white">Humidity</div>
+          <div className="mt-4 text-2xl text-white">Humidity</div>
           
           {/* Enhanced comfort indicator */}
           <div className="mt-4 relative h-3 bg-gray-700 rounded-full overflow-hidden w-full">
@@ -334,10 +392,10 @@ const Dashboard = () => {
             </div>
             <div 
               className="absolute top-0 w-4 h-4 bg-white rounded-full transform -translate-y-1/4 shadow-lg transition-all duration-700 ease-out"
-              style={{ left: `calc(${Math.min(100, Math.max(0, value))}% - 8px)` }}
+              style={{ left: `calc(${Math.min(100, Math.max(0, displayValue))}% - 8px)` }}
             />
           </div>
-          <div className="flex justify-between text-xs text-white text-opacity-60 mt-1">
+          <div className="flex justify-between text-base text-white text-opacity-60 mt-1">
             <span>Dry</span>
             <span>Optimal</span>
             <span>Humid</span>
@@ -349,10 +407,11 @@ const Dashboard = () => {
 
   // Enhanced Circular Gauge with proper alignment
   const CircularGauge = ({ value, sensorType, title, icon, min = 0, max = 1000 }) => {
-    const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
+    const displayValue = getDisplayValue(value, min + (max - min) / 2);
+    const percentage = Math.min(100, Math.max(0, ((displayValue - min) / (max - min)) * 100));
     const circumference = 2 * Math.PI * 60;
     const offset = circumference - (percentage / 100 * circumference);
-    const status = getSensorStatus(sensorType, value);
+    const status = getSensorStatus(sensorType, displayValue);
     const range = SENSOR_RANGES[sensorType];
     
     return (
@@ -428,7 +487,7 @@ const Dashboard = () => {
               fontWeight="bold"
               className="transition-all duration-500"
             >
-              {value.toFixed(range.decimals)}
+              {displayValue.toFixed(range.decimals)}
             </text>
             <text 
               x="90" 
@@ -442,9 +501,9 @@ const Dashboard = () => {
             </text>
           </svg>
         </div>
-        <div className="text-center mt-2 text-sm text-white font-medium">{title}</div>
+        <div className="text-center mt-2 text-xl text-white font-medium">{title}</div>
         <div 
-          className={`text-xs px-2 py-1 rounded-full mt-1 text-white transition-all duration-500`}
+          className={`text-base px-2 py-1 rounded-full mt-1 text-white transition-all duration-500`}
           style={{ backgroundColor: `${status.color}20` }}
         >
           {status === STATUS_COLORS.GOOD ? 'GOOD' : 
@@ -457,7 +516,7 @@ const Dashboard = () => {
   // Enhanced Weather Card
   const WeatherCard = () => (
     <div className="flex flex-col h-full">
-      <h3 className="text-xl font-medium mb-3 text-white">{WEATHER_CONFIG.location}</h3>
+      <h3 className="text-2xl font-medium mb-3 text-white">{WEATHER_CONFIG.location}</h3>
       <div className="flex-grow flex items-center justify-center p-2">
         <div className="text-center w-full">
           {/* Weather icon */}
@@ -485,8 +544,8 @@ const Dashboard = () => {
           <div className="text-4xl font-bold text-white mb-1 flex items-center justify-center">
             {WEATHER_CONFIG.defaultTemperature}<span className="text-2xl ml-1">°C</span>
           </div>
-          <div className="text-xl text-yellow-400 mb-2">{WEATHER_CONFIG.defaultCondition}</div>
-          <div className="text-sm text-white opacity-75 flex items-center justify-center">
+          <div className="text-2xl text-yellow-400 mb-2 ">{WEATHER_CONFIG.defaultCondition}</div>
+          <div className="text-xl text-white opacity-75 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 2L6 8c-3 3-3 8 0 12h12c3-4 3-9 0-12L12 2z" />
             </svg>
@@ -499,11 +558,12 @@ const Dashboard = () => {
 
   // Realistic Pressure Gauge with proper number scaling
   const PressureGauge = ({ value, min = 0, max = 10 }) => {
-    const clampedValue = Math.max(min, Math.min(max, value));
+    const displayValue = getDisplayValue(value, 1.75);
+    const clampedValue = Math.max(min, Math.min(max, displayValue));
     const valueRange = max - min;
     const normalizedValue = (clampedValue - min) / valueRange;
     const needleAngle = -45 + (normalizedValue * 270); // -45° to +135° (270° total)
-    const status = getSensorStatus('DIFFERENTIAL_PRESSURE', value);
+    const status = getSensorStatus('DIFFERENTIAL_PRESSURE', displayValue);
     
     // Generate scale numbers (0, 2, 4, 6, 8, 10)
     const generateScaleNumbers = () => {
@@ -618,7 +678,7 @@ const Dashboard = () => {
             />
           </svg>
         </div>
-        <div className="text-center mt-2 text-lg text-white">Differential Pressure</div>
+        <div className="text-center mt-2 text-xl text-white">Differential Pressure</div>
       </div>
     );
   };
@@ -688,6 +748,24 @@ const Dashboard = () => {
     );
   };
 
+  // Show loading state when data is not yet available
+  if (isDataLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-black">
+        <div className="text-center text-white">
+          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+          <h2 className="text-2xl font-bold mb-2">Loading Sensor Data...</h2>
+          <p className="text-lg opacity-75">Connecting to backend server</p>
+          {error && (
+            <div className="mt-4 p-4 bg-red-900 bg-opacity-50 rounded-lg">
+              <p className="text-red-300">Error: {error}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // Main render logic
   if (currentPage === 'building') {
     return <BuildingPage />;
@@ -719,14 +797,8 @@ const Dashboard = () => {
           <div className="flex items-center">
             <img src={daikinLogo} alt="DAIKIN" className="h-10 w-auto" />
           </div>
-          
-          <div className="text-center flex items-center justify-center space-x-6">
-            <div className="text-lg md:text-xl font-light text-white">
-              {currentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            </div>
-            <div className="text-lg md:text-xl font-light text-white">
-              {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-            </div>
+          <div className="text-xl font-medium text-white">
+            Indoor Air Quality Dashboard
           </div>
           
           <div className="flex gap-4">
@@ -763,34 +835,34 @@ const Dashboard = () => {
             {/* Temperature Card */}
             <div className="glass-card overflow-hidden flex flex-col row-span-1 row-start-1">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-medium text-white">Temperature</h3>
-                <EnhancedStatusIndicator value={sensorData.TEMPERATURE || 22.9} sensorType="TEMPERATURE" />
+                <h3 className="text-2xl font-medium text-white">Temperature</h3>
+                <EnhancedStatusIndicator value={sensorData.TEMPERATURE} sensorType="TEMPERATURE" />
               </div>
               <div className="flex-grow">
-                <ThermometerDisplay value={sensorData.TEMPERATURE || 22.9} />
+                <ThermometerDisplay value={sensorData.TEMPERATURE} />
               </div>
             </div>
             
             {/* Humidity Card */}
             <div className="glass-card overflow-hidden flex flex-col row-span-1 row-start-1">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="text-xl font-medium text-white">Humidity</h3>
-                <EnhancedStatusIndicator value={sensorData.HUMIDITY || 53.47} sensorType="HUMIDITY" />
+                <h3 className="text-2xl font-medium text-white">Humidity</h3>
+                <EnhancedStatusIndicator value={sensorData.HUMIDITY} sensorType="HUMIDITY" />
               </div>
               <div className="flex-grow">
-                <HumidityDisplay value={sensorData.HUMIDITY || 53.47} />
+                <HumidityDisplay value={sensorData.HUMIDITY} />
               </div>
             </div>
             
             {/* CO2 Card */}
             <div className="glass-card overflow-hidden flex flex-col row-span-1 row-start-2">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="text-xl font-medium text-white">Carbon Dioxide</h3>
-                <EnhancedStatusIndicator value={sensorData.CO2 || 656.53} sensorType="CO2" />
+                <h3 className="text-2xl font-medium text-white">Carbon Dioxide</h3>
+                <EnhancedStatusIndicator value={sensorData.CO2} sensorType="CO2" />
               </div>
               <div className="flex-grow">
                 <CircularGauge 
-                  value={sensorData.CO2 || 656.53} 
+                  value={sensorData.CO2} 
                   sensorType="CO2"
                   title="CO₂"
                   min={300}
@@ -812,12 +884,12 @@ const Dashboard = () => {
             {/* PM2.5 Card */}
             <div className="glass-card overflow-hidden flex flex-col row-span-1 row-start-2">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="text-xl font-medium text-white">Particulate Matter</h3>
-                <EnhancedStatusIndicator value={sensorData.PM25 || 16.60} sensorType="PM25" />
+                <h3 className="text-2xl font-medium text-white">Particulate Matter</h3>
+                <EnhancedStatusIndicator value={sensorData.PM25} sensorType="PM25" />
               </div>
               <div className="flex-grow">
                 <CircularGauge 
-                  value={sensorData.PM25 || 16.60} 
+                  value={sensorData.PM25} 
                   sensorType="PM25"
                   title="PM2.5"
                   min={0}
@@ -846,12 +918,12 @@ const Dashboard = () => {
             {/* TVOC Card */}
             <div className="glass-card overflow-hidden flex flex-col row-span-1 row-start-3">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="text-xl font-medium text-white">Volatile Compounds</h3>
-                <EnhancedStatusIndicator value={sensorData.TVOC || 0.328} sensorType="TVOC" />
+                <h3 className="text-2xl font-medium text-white">Volatile Compounds</h3>
+                <EnhancedStatusIndicator value={sensorData.TVOC} sensorType="TVOC" />
               </div>
               <div className="flex-grow">
                 <CircularGauge 
-                  value={sensorData.TVOC || 0.328} 
+                  value={sensorData.TVOC} 
                   sensorType="TVOC"
                   title="TVOC"
                   min={0}
@@ -870,11 +942,11 @@ const Dashboard = () => {
             {/* Differential Pressure Card */}
             <div className="glass-card overflow-hidden flex flex-col row-span-1 row-start-3">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="text-xl font-medium text-white">Differential Pressure</h3>
-                <EnhancedStatusIndicator value={sensorData.DIFFERENTIAL_PRESSURE || 4.03} sensorType="DIFFERENTIAL_PRESSURE" />
+                <h3 className="text-2xl font-medium text-white">Differential Pressure</h3>
+                <EnhancedStatusIndicator value={sensorData.DIFFERENTIAL_PRESSURE} sensorType="DIFFERENTIAL_PRESSURE" />
               </div>
               <div className="flex-grow">
-                <PressureGauge value={sensorData.DIFFERENTIAL_PRESSURE || 4.03} />
+                <PressureGauge value={sensorData.DIFFERENTIAL_PRESSURE} />
               </div>
             </div>
           </div>
@@ -888,6 +960,11 @@ const Dashboard = () => {
                 <circle cx="10" cy="10" r="10" />
               </svg>
               Last updated: {lastUpdate.toLocaleTimeString()}
+              {connectionStatus.simulation && (
+                <span className="ml-2 px-2 py-1 bg-blue-500 bg-opacity-30 rounded text-xs">
+                  SIMULATION
+                </span>
+              )}
             </span>
           </div>
           <div>© Siam Daikin Sales Co., Ltd.</div>

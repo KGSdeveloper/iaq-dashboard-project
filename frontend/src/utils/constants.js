@@ -25,11 +25,11 @@ export const MODBUS_CONFIG = {
 export const SENSOR_RANGES = {
   PM25: { 
     min: 0, 
-    max: 500, 
+    max: 50, 
     unit: 'µg/m³', 
-    good: { min: 0, max: 35 },
-    warning: { min: 35, max: 75 },
-    danger: { min: 75, max: 500 },
+    good: { min: 0, max: 15 },
+    warning: { min: 15, max: 30 },
+    danger: { min: 30, max: 50 },
     decimals: 1
   },
   CO2: { 
@@ -61,7 +61,7 @@ export const SENSOR_RANGES = {
   },
   TVOC: { 
     min: 0, 
-    max: 10, 
+    max: 5, 
     unit: 'mg/m³', 
     good: { min: 0, max: 0.3 },
     warning: { min: 0.3, max: 3 },
@@ -69,12 +69,12 @@ export const SENSOR_RANGES = {
     decimals: 2
   },
   DIFFERENTIAL_PRESSURE: { 
-    min: 0, 
-    max: 10, 
+    min: -3, 
+    max: 5, 
     unit: 'Pa',
-    good: { min: 2, max: 8 },
-    warning: { min: 1, max: 9 },
-    danger: { min: 0, max: 10 },
+    good: { min: 0.1, max: 5 },
+    warning: { min: -1, max: 0 },
+    danger: { min: -3, max: -1 },
     decimals: 2
   }
 };
