@@ -10,16 +10,6 @@ export const SENSOR_TYPES = {
   DIFFERENTIAL_PRESSURE: 'Differential Pressure'
 };
 
-export const MODBUS_CONFIG = {
-  DEVICE_ADDRESS: 1,
-  REGISTERS: {
-    PM25: 61,
-    CO2: 62,
-    TEMPERATURE: 63,
-    HUMIDITY: 64,
-    TVOC: 65
-  }
-};
 
 // Enhanced sensor ranges with status thresholds
 export const SENSOR_RANGES = {
@@ -36,8 +26,8 @@ export const SENSOR_RANGES = {
     min: 300, 
     max: 5000, 
     unit: 'ppm', 
-    good: { min: 300, max: 1000 },
-    warning: { min: 1000, max: 2000 },
+    good: { min: 300, max: 1200 },
+    warning: { min: 1200, max: 2000 },
     danger: { min: 2000, max: 5000 },
     decimals: 0
   },

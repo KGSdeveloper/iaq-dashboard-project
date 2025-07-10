@@ -5,6 +5,18 @@ const socketIo = require('socket.io');
 const ModbusRTU = require('modbus-serial');
 const cors = require('cors');
 
+const fs = require('fs');
+const path = require('path');
+const LOG_FILE = path.join(__dirname,'history', 'iaq-data-log.csv');
+
+if (!fs.existsSync(LOG_FILE)) {
+  const headers = 'timestamp,PM2.5 (ug/m3),CO2 (ppm),Temp (C),Humidity (%),TVOC (mg/m3),Pressure (Pa),source\n';
+  fs.writeFileSync(LOG_FILE, headers);
+}
+
+const localTimestamp = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Bangkok' });
+// Example: "10/07/2025, 17:45:10"
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
@@ -33,11 +45,11 @@ const MODBUS_CONFIG = {
 };
 
 const REGISTERS = {
-  PM25: 61,
-  CO2: 62,
-  TEMPERATURE: 63,
-  HUMIDITY: 64,
-  TVOC: 65
+  PM25: 56,
+  CO2: 60,
+  TEMPERATURE: 58,
+  HUMIDITY: 59,
+  TVOC: 61
 };
 
 // Connection status tracking
@@ -46,7 +58,7 @@ let lastSensorData = null;
 let dataPollingInterval = null;
 
 // Force simulation mode flag - set to true when no sensor available
-const FORCE_SIMULATION = true; // Set this to false when you have a real sensor
+const FORCE_SIMULATION = false; // Set this to false when you have a real sensor
 
 // Smooth continuous simulation with state persistence
 let simulationState = {
@@ -77,6 +89,81 @@ let simulationState = {
     DIFFERENTIAL_PRESSURE: 0
   }
 };
+
+
+function appendToCSV(data, source) {
+
+  if (!fs.existsSync(LOG_FILE)) {
+    const headers = 'timestamp,PM2.5 (µg/m³),CO2 (ppm),Temp (°C),Humidity (%),TVOC (mg/m³),Pressure (Pa),source\n';
+    fs.writeFileSync(LOG_FILE, headers);
+  }
+
+  const csvLine = [
+    data.timestamp,
+    data.PM25.toFixed(2),
+    data.CO2.toFixed(0),
+    data.TEMPERATURE.toFixed(2),
+    data.HUMIDITY.toFixed(2),
+    data.TVOC.toFixed(3),
+    data.DIFFERENTIAL_PRESSURE.toFixed(2),
+    source
+  ].join(',') + '\n';
+
+  // Check size before appending
+  fs.stat(LOG_FILE, (err, stats) => {
+    if (err && err.code !== 'ENOENT') {
+      console.error('❌ Error checking log file size:', err.message);
+      return;
+    }
+
+    const currentSize = stats ? stats.size : 0;
+    const maxSize = 1 * 1024 * 1024 * 1024; // 1 GB
+
+    if (currentSize < maxSize) {
+      fs.appendFile(LOG_FILE, csvLine, (err) => {
+        if (err) {
+          console.error('❌ Failed to write to log file:', err.message);
+        }
+      });
+    } else {
+      console.warn('⚠️ Log file reached 1GB. Logging stopped.');
+    }
+  });
+}
+
+
+
+function generateSimulatedPressure() {
+  const min = 1.0;
+  const max = 2.5;
+  const fluctuation = 0.05; // Smooth fluctuation each read
+
+  // Initialize if needed
+  if (typeof generateSimulatedPressure.current === 'undefined') {
+    generateSimulatedPressure.current = (min + max) / 2; // Start mid-range
+    generateSimulatedPressure.trend = 1;
+  }
+
+  // Change direction occasionally
+  if (Math.random() < 0.1) {
+    generateSimulatedPressure.trend *= -1;
+  }
+
+  // Update value
+  generateSimulatedPressure.current += generateSimulatedPressure.trend * (Math.random() * fluctuation);
+
+  // Clamp value within bounds
+  if (generateSimulatedPressure.current < min) {
+    generateSimulatedPressure.current = min + (min - generateSimulatedPressure.current) * 0.5;
+    generateSimulatedPressure.trend = 1;
+  } else if (generateSimulatedPressure.current > max) {
+    generateSimulatedPressure.current = max - (generateSimulatedPressure.current - max) * 0.5;
+    generateSimulatedPressure.trend = -1;
+  }
+
+  return parseFloat(generateSimulatedPressure.current.toFixed(2));
+}
+
 
 function generateSimulatedData() {
   // Define sensor ranges and maximum change per interval
@@ -129,8 +216,8 @@ function generateSimulatedData() {
     TEMPERATURE: simulationState.TEMPERATURE,
     HUMIDITY: simulationState.HUMIDITY,
     TVOC: simulationState.TVOC,
-    DIFFERENTIAL_PRESSURE: simulationState.DIFFERENTIAL_PRESSURE,
-    timestamp: new Date().toISOString(),
+    DIFFERENTIAL_PRESSURE: generateSimulatedPressure(),
+    timestamp: localTimestamp,
     connectionStatus: {
       connected: false,
       simulation: true,
@@ -175,7 +262,7 @@ async function connectModbus() {
     client.setTimeout(5000);
     
     // Test reading a register
-    const testResponse = await client.readHoldingRegisters(REGISTERS.PM25, 1);
+    const testResponse = await client.readInputRegisters(REGISTERS.PM25, 1);
     
     isConnected = true;
     connectionAttempts = 0;
@@ -208,17 +295,17 @@ async function readSensorData() {
   }
 
   try {
-    const response = await client.readHoldingRegisters(REGISTERS.PM25, 5);
+    const response = await client.readInputRegisters(REGISTERS.PM25, 6);
     const raw = response.data;
     
     return {
-      PM25: raw[0] / 100,
-      CO2: raw[1],
+      PM25: raw[0] / 10,
+      CO2: raw[4],
       TEMPERATURE: raw[2] / 100,
       HUMIDITY: raw[3] / 100,
-      TVOC: raw[4],
+      TVOC: raw[5] / 1000,
       DIFFERENTIAL_PRESSURE: generateSimulatedPressure(),
-      timestamp: new Date().toISOString(),
+      timestamp: localTimestamp,
       connectionStatus: {
         connected: true,
         simulation: false,
@@ -256,7 +343,25 @@ function startDataPolling() {
       } else {
         data = generateSimulatedData();
       }
-      
+
+      const source = isConnected ? 'real' : 'simulated'; 
+      	
+      // ✅ Log to console here regardless of source
+      console.log('📊 Polled Data:', {
+        Source: source,
+        PM25: data.PM25.toFixed(2) + ' µg/m³',
+        CO2: data.CO2.toFixed(0) + ' ppm',
+        TEMP: data.TEMPERATURE.toFixed(1) + ' °C',
+        HUM: data.HUMIDITY.toFixed(1) + ' %',
+        TVOC: data.TVOC.toFixed(3) + ' mg/m³',
+         PRESS: data.DIFFERENTIAL_PRESSURE.toFixed(2) + ' Pa'
+      });
+
+      // ✅ Call CSV logger here
+      if (isConnected) {
+        appendToCSV(data, source);
+      }
+	
       lastSensorData = data;
       
       // Always broadcast to all connected clients
