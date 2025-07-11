@@ -23,10 +23,10 @@ export const SENSOR_RANGES = {
     decimals: 1
   },
   CO2: { 
-    min: 300, 
+    min: 0, 
     max: 5000, 
     unit: 'ppm', 
-    good: { min: 300, max: 1200 },
+    good: { min: 0, max: 1200 },
     warning: { min: 1200, max: 2000 },
     danger: { min: 2000, max: 5000 },
     decimals: 0
